@@ -1,0 +1,226 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>导出打印处理</title>
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap@4.0.0/dist/css/bootstrap.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/datatables@1.10.13/media/css/jquery.dataTables.min.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/datatables.net-bs4@1.10.16/css/dataTables.bootstrap4.css"/>
+    <script type="text/javascript" src="https://unpkg.com/jszip@3.1.5/dist/jszip.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/pdfmake@0.1.36/build/vfs_fonts.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/pdfmake@0.1.36/build/pdfmake.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/jquery@3.3.1/dist/jquery.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/datatables@1.10.13/media/js/jquery.dataTables.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/datatables.net-bs4@1.10.16/js/dataTables.bootstrap4.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/datatables.net-buttons@1.5.1/js/dataTables.buttons.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/datatables.net-buttons@1.5.1/js/buttons.html5.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/datatables.net-buttons@1.5.1/js/buttons.print.js"></script>
+    <script type="text/javascript" src="data.option.js"></script>
+    <script type="text/javascript" src="data.test.js"></script>
+    <style>
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            padding: 0;
+            overflow: auto;
+        }
+
+        .total {
+            background-color: rgba(0, 0, 0, 0.05);
+            text-align: left !important;
+            padding-left: 30px !important;
+        }
+
+        #t_button {
+            display: inline-block;
+            padding-left: 5px;
+        }
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h4>导出打印处理<span id="t_button"></span></h4>
+            <table id="exp2" class="table table-bordered"></table>
+        </div>
+    </div>
+</div>
+</body>
+
+<script>
+    $(function () {
+        var mainTable;
+
+        var list = [];
+        $.each(exp1_data || [], function (riverKey, river) {
+            var Q_RATE = 0;
+            var Z_RATE = 0;
+            var Q_COUNT = 0;
+            var Z_COUNT = 0;
+            $.each(river['SECTION_DETAILS'] || [], function (sectionKey, section) {
+                var Q_ECO = null;
+                var Z_ECO = null;
+                $.each(section['RS_ECO_DATAS'] || [], function (ecoKey, eco) {
+                    if (eco['ED_TT_ID'] == 1) {
+                        Q_ECO = eco['AVG_AMOUNT'];
+                    } else if (eco['ED_TT_ID'] == 2) {
+                        Z_ECO = eco['AVG_AMOUNT'];
+                    }
+                });
+                var obj = {
+                    R_NAME: river['R_NAME'],
+                    RS_ID: section['RS_ID'],
+                    FRIST: sectionKey == 0,
+                    ROWS: river['SECTION_DETAILS'].length + 1 - sectionKey,
+                    RS_NAME: section['RS_NAME'],
+                    Q_VALUE: section['RS_QZ_VAULES'][0]['Q_VALUE'],
+                    Z_VALUE: section['RS_QZ_VAULES'][0]['Z_VALUE'],
+                    Q_ECO: Q_ECO,
+                    Z_ECO: Z_ECO,
+                }
+                if (obj.Q_VALUE >= obj.Q_ECO) {
+                    Q_COUNT++;
+                }
+                if (obj.Z_VALUE >= obj.Z_ECO) {
+                    Z_COUNT++;
+                }
+                list.push(obj);
+            });
+            Q_RATE = Q_COUNT / river['SECTION_DETAILS'].length * 100;
+            Z_RATE = Z_COUNT / river['SECTION_DETAILS'].length * 100;
+            list.push({
+                R_NAME: river['R_NAME'],
+                RS_NAME: '统计',
+                RS_ID: null,
+                ROWS: 1,
+                COLS: 5,
+                TOTAL: true,
+                Q_RATE: Q_RATE,
+                Z_RATE: Z_RATE,
+                Q_VALUE: 0,
+                Z_VALUE: 0,
+                Q_ECO: 0,
+                Z_ECO: 0,
+            });
+        });
+
+        var config = $.extend({}, datatable_local, {
+            buttons: [
+                {
+                    'extend': 'print',
+                    'text': '打印',
+                    'title': '分析总结',
+                    'className': 'btn btn-info', //按钮的class样式
+                    // 'autoPrint': false,
+                    'exportOptions': {
+                        'stripHtml': false,
+                        'format': {
+                            header: function (data, column) {
+                                return data;
+                            },
+                            body: function (data, row, column, node) {
+                                if (data == 0) {
+                                    return '0';
+                                }
+                                return data;
+                            }
+                        }
+                    }
+                },
+                {
+                    'extend': 'excelHtml5', //导出文件格式为excel
+                    'text': '导出',  //按钮标题
+                    'title': '分析总结', //导出的excel标题
+                    'className': 'btn btn-warning', //按钮的class样式
+                    'exportOptions': { //从DataTable中选择要收集的数据。这包括列、行、排序和搜索的选项。请参阅button.exportdata()方法以获得完整的详细信息——该参数所提供的对象将直接传递到该操作中，以收集所需的数据，更多options选项参见：https://datatables.net/reference/api/buttons.exportData()
+                        'format': { //用于导出将使用的单元格格式化函数的容器对象 format有三个子标签，header，body和foot
+                            header: function (data, column) {
+                                return data;
+                            },
+                            body: function (data, row, column, node) { //body区域的function，可以操作需要导出excel的数据格式
+                                if (data == 0) {
+                                    return '0';
+                                }
+                                return data;
+                            }
+                        }
+                    }
+                }],
+            data: list,
+            bSort: false,
+            columns: [
+                {
+                    title: '河流名称', data: 'R_NAME', 'class': 'text-center',
+                    fnCreatedCell: function (nTd, sData, oData, iRow, iCol) {
+                        if (oData['FRIST'] || (iRow % 15 == 0)) {
+                            $(nTd).attr('rowspan', oData['ROWS']);
+                        } else {
+                            $(nTd).remove();
+                        }
+                    }
+                },
+                {
+                    title: '断面名称', data: 'RS_NAME', 'class': 'text-center',
+                    fnCreatedCell: function (nTd, sData, oData, iRow, iCol) {
+                        if (oData['TOTAL']) {
+                            $(nTd).attr('colspan', oData['COLS']);
+                            $(nTd).html('按日平均达标率：水位' + oData['Z_RATE'] + '%，流量：' + oData['Q_RATE'] + '%');
+                            $(nTd).addClass('total');
+                        }
+                    }
+                },
+                {
+                    title: '生态水位均值（m）', data: 'Z_ECO', 'class': 'text-center',
+                    fnCreatedCell: function (nTd, sData, oData, iRow, iCol) {
+                        if (oData['TOTAL']) {
+                            $(nTd).remove();
+                        } else {
+                            if (sData == null) {
+                                $(nTd).html('--');
+                            }
+                        }
+                    }
+                },
+                {
+                    title: '断面水位均值（m）', data: 'Z_VALUE', 'class': 'text-center',
+                    fnCreatedCell: function (nTd, sData, oData, iRow, iCol) {
+                        if (oData['TOTAL']) {
+                            $(nTd).remove();
+                        } else {
+                            if (sData == null) {
+                                $(nTd).html('--');
+                            }
+                        }
+                    }
+                },
+                {
+                    title: '生态流量均值（m³/s）', data: 'Q_ECO', 'class': 'text-center',
+                    fnCreatedCell: function (nTd, sData, oData, iRow, iCol) {
+                        if (oData['TOTAL']) {
+                            $(nTd).remove();
+                        } else {
+                            if (sData == null) {
+                                $(nTd).html('--');
+                            }
+                        }
+                    }
+                },
+                {
+                    title: '断面流量均值（m³/s）', data: 'Q_VALUE', 'class': 'text-center',
+                    fnCreatedCell: function (nTd, sData, oData, iRow, iCol) {
+                        if (oData['TOTAL']) {
+                            $(nTd).remove();
+                        } else {
+                            if (sData == null) {
+                                $(nTd).html('--');
+                            }
+                        }
+                    }
+                },
+            ]
+        });
+        if (mainTable) mainTable.fnDestroy();
+        mainTable = $('#exp2').dataTable(config);
+        mainTable.api().buttons().container().appendTo($('#t_button'));
+    });
+</script>
+</html>
